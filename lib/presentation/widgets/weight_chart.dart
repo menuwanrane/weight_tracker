@@ -38,9 +38,24 @@ class WeightChart extends StatelessWidget {
               sideTitles: SideTitles(showTitles: false),
             ),
 
-            // Hide Y-axis values completely
-            leftTitles: const AxisTitles(
-              sideTitles: SideTitles(showTitles: false),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 35,
+                interval: 1,
+                getTitlesWidget: (value, meta) {
+                  return Text(
+                    value.toInt().toString(),
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Theme.of(context)
+                          .textTheme
+                          .bodySmall
+                          ?.color,
+                    ),
+                  );
+                },
+              ),
             ),
 
             // Only show dates at bottom
