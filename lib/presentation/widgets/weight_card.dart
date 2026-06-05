@@ -1,7 +1,18 @@
 import 'package:flutter/material.dart';
 
+import '../utils/weight_units.dart';
+
 class WeightCard extends StatelessWidget {
-  const WeightCard({super.key});
+  final double? weight;
+  final DateTime? logDate;
+  final String unit;
+
+  const WeightCard({
+    super.key,
+    required this.weight,
+    required this.logDate,
+    required this.unit,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -16,27 +27,27 @@ class WeightCard extends StatelessWidget {
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
-                Text(
+              children: [
+                const Text(
                   'Current Weight',
-                  style: TextStyle(
-                    color: Colors.grey,
-                  ),
+                  style: TextStyle(color: Colors.grey),
                 ),
-                SizedBox(height: 8),
+                const SizedBox(height: 8),
                 Text(
-                  '82.5 kg',
-                  style: TextStyle(
+                  weight == null
+                      ? '-- ${unitSuffix(unit)}'
+                      : formatWeight(weight!, unit),
+                  style: const TextStyle(
                     fontSize: 34,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-                SizedBox(height: 4),
+                const SizedBox(height: 4),
                 Text(
-                  'Last updated today',
-                  style: TextStyle(
-                    color: Colors.grey,
-                  ),
+                  logDate == null
+                      ? 'No records yet'
+                      : 'Last updated ${_formatDate(logDate!)}',
+                  style: const TextStyle(color: Colors.grey),
                 ),
               ],
             ),
@@ -46,16 +57,27 @@ class WeightCard extends StatelessWidget {
             height: 60,
             width: 60,
             decoration: BoxDecoration(
-              color: Colors.blue.withOpacity(.15),
+              color: Colors.blue.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(16),
             ),
-            child: const Icon(
-              Icons.monitor_weight,
-              color: Colors.blue,
-            ),
+            child: const Icon(Icons.monitor_weight, color: Colors.blue),
           ),
         ],
       ),
     );
+  }
+
+  String _formatDate(DateTime date) {
+    final today = DateTime.now();
+    final normalizedToday = DateTime(today.year, today.month, today.day);
+    final normalizedDate = DateTime(date.year, date.month, date.day);
+
+    if (normalizedDate == normalizedToday) {
+      return 'today';
+    }
+
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 }

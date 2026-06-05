@@ -1,22 +1,37 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../data/models/weight_log.dart';
+import '../../providers/settings_provider.dart';
+import '../../providers/weight_provider.dart';
+import '../../utils/weight_units.dart';
+import '../edit_weight.dart/edit_weight_screen.dart';
 import '../../widgets/history_tile.dart';
 
-class HistoryScreen extends StatefulWidget {
+class HistoryScreen extends ConsumerStatefulWidget {
   const HistoryScreen({super.key});
 
   @override
-  State<HistoryScreen> createState() => _HistoryScreenState();
+  ConsumerState<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
-  final TextEditingController searchController =
-      TextEditingController();
+class _HistoryScreenState extends ConsumerState<HistoryScreen> {
+  final TextEditingController searchController = TextEditingController();
 
   String selectedSort = 'Newest';
 
   @override
+  void dispose() {
+    searchController.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final weights = ref.watch(weightProvider);
+    final settings = ref.watch(settingsProvider);
+    final unit = settings.valueOrNull?.weightUnit ?? 'KG';
+
     return Scaffold(
       body: SafeArea(
         child: Padding(
@@ -27,10 +42,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   'History',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.bold,
-                  ),
+                  style: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
                 ),
               ),
 
@@ -38,12 +50,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
 
               TextField(
                 controller: searchController,
+                onChanged: (_) => setState(() {}),
                 decoration: InputDecoration(
                   hintText: 'Search records',
                   prefixIcon: const Icon(Icons.search),
                   border: OutlineInputBorder(
-                    borderRadius:
-                        BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(16),
                   ),
                 ),
               ),
@@ -54,9 +66,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 children: [
                   const Text(
                     'Sort:',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
+                    style: TextStyle(fontWeight: FontWeight.w600),
                   ),
 
                   const SizedBox(width: 12),
@@ -64,14 +74,8 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   DropdownButton<String>(
                     value: selectedSort,
                     items: const [
-                      DropdownMenuItem(
-                        value: 'Newest',
-                        child: Text('Newest'),
-                      ),
-                      DropdownMenuItem(
-                        value: 'Oldest',
-                        child: Text('Oldest'),
-                      ),
+                      DropdownMenuItem(value: 'Newest', child: Text('Newest')),
+                      DropdownMenuItem(value: 'Oldest', child: Text('Oldest')),
                     ],
                     onChanged: (value) {
                       setState(() {
@@ -85,43 +89,34 @@ class _HistoryScreenState extends State<HistoryScreen> {
               const SizedBox(height: 12),
 
               Expanded(
-                child: ListView(
-                  children: [
-                    HistoryTile(
-                      weight: '82.5 kg',
-                      date: '03 Jun 2026',
-                      onEdit: () {},
-                      onDelete: () {},
-                    ),
+                child: weights.when(
+                  loading: () =>
+                      const Center(child: CircularProgressIndicator()),
+                  error: (error, stackTrace) =>
+                      Center(child: Text(error.toString())),
+                  data: (data) {
+                    final visibleLogs = _visibleLogs(data);
 
-                    HistoryTile(
-                      weight: '82.8 kg',
-                      date: '02 Jun 2026',
-                      onEdit: () {},
-                      onDelete: () {},
-                    ),
+                    if (visibleLogs.isEmpty) {
+                      return const Center(
+                        child: Text('No weight records found'),
+                      );
+                    }
 
-                    HistoryTile(
-                      weight: '83.0 kg',
-                      date: '01 Jun 2026',
-                      onEdit: () {},
-                      onDelete: () {},
-                    ),
+                    return ListView.builder(
+                      itemCount: visibleLogs.length,
+                      itemBuilder: (context, index) {
+                        final log = visibleLogs[index];
 
-                    HistoryTile(
-                      weight: '83.2 kg',
-                      date: '31 May 2026',
-                      onEdit: () {},
-                      onDelete: () {},
-                    ),
-
-                    HistoryTile(
-                      weight: '83.4 kg',
-                      date: '30 May 2026',
-                      onEdit: () {},
-                      onDelete: () {},
-                    ),
-                  ],
+                        return HistoryTile(
+                          weight: formatWeight(log.weight, unit),
+                          date: _formatDate(log.logDate),
+                          onEdit: () => _openEdit(log),
+                          onDelete: () => _delete(log),
+                        );
+                      },
+                    );
+                  },
                 ),
               ),
             ],
@@ -129,5 +124,48 @@ class _HistoryScreenState extends State<HistoryScreen> {
         ),
       ),
     );
+  }
+
+  List<WeightLog> _visibleLogs(List<WeightLog> data) {
+    final query = searchController.text.trim().toLowerCase();
+
+    final filtered = data.where((log) {
+      if (query.isEmpty) {
+        return true;
+      }
+
+      return log.weight.toString().contains(query) ||
+          _formatDate(log.logDate).toLowerCase().contains(query);
+    }).toList();
+
+    filtered.sort((a, b) {
+      final comparison = a.logDate.compareTo(b.logDate);
+
+      return selectedSort == 'Newest' ? -comparison : comparison;
+    });
+
+    return filtered;
+  }
+
+  void _openEdit(WeightLog log) {
+    Navigator.of(
+      context,
+    ).push(MaterialPageRoute(builder: (_) => EditWeightScreen(weightLog: log)));
+  }
+
+  Future<void> _delete(WeightLog log) async {
+    final id = log.id;
+
+    if (id == null) {
+      return;
+    }
+
+    await ref.read(weightProvider.notifier).deleteWeight(id);
+  }
+
+  String _formatDate(DateTime date) {
+    return '${date.day.toString().padLeft(2, '0')}/'
+        '${date.month.toString().padLeft(2, '0')}/'
+        '${date.year}';
   }
 }
