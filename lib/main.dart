@@ -3,8 +3,14 @@ import 'package:flutter/material.dart';
 import 'core/theme/app_theme.dart';
 import 'presentation/widgets/bottom_nav_bar.dart';
 
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+
 void main() {
-  runApp(const WeightTrackerApp());
+  runApp(
+    const ProviderScope(
+      child: WeightTrackerApp(),
+    ),
+  );
 }
 
 class WeightTrackerApp extends StatelessWidget {
